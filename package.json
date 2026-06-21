@@ -1,0 +1,16 @@
+{
+  "name": "whatsapp-bot-cloud",
+  "version": "1.0.0",
+  "main": "send.js",
+  "scripts": {
+    "start": "node send.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
+    "qrcode": "^1.5.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: whatsapp-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node send.js
+    envVars:
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "false"
