@@ -1,26 +1,23 @@
-// ============================================================
-// WhatsApp Bot - Cloud Version (Render.com)
-// ============================================================
-// Yeh server cloud par chalega 24x7. QR code ek WEB PAGE par
-// dikhega (terminal ki zarurat nahi) - bas browser me URL kholo.
-// ============================================================
-
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const http = require('http');
 
 const PORT = process.env.PORT || 3000;
-const DELAY_MS = 4000; // har message ke beech delay
+const DELAY_MS = 4000;
 
 let isReady = false;
 let isSending = false;
-let lastQR = null; // latest QR code (as data-url image)
-let statusMsg = 'Starting up...';
+let lastQR = null;
+let statusMsg = 'Starting up... please wait.';
+
+// Render par Chrome ka path
+const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable';
 
 const client = new Client({
-  authStrategy: new LocalAuth({ dataPath: '/opt/render/project/src/.wwebjs_auth' }),
+  authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
+    executablePath: CHROME_PATH,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -35,9 +32,9 @@ const client = new Client({
 });
 
 client.on('qr', async (qr) => {
-  statusMsg = 'QR Code ready! Scan karo neeche diye gaye QR ko.';
+  statusMsg = '📱 QR Code ready! Neeche scan karo.';
   lastQR = await QRCode.toDataURL(qr);
-  console.log('QR code generated - open the web page to scan it.');
+  console.log('QR generated - open web page to scan');
 });
 
 client.on('ready', () => {
@@ -49,6 +46,7 @@ client.on('ready', () => {
 
 client.on('authenticated', () => {
   statusMsg = '🔐 Authenticated, connecting...';
+  console.log(statusMsg);
 });
 
 client.on('auth_failure', (msg) => {
@@ -64,7 +62,6 @@ client.on('disconnected', (reason) => {
 
 client.initialize();
 
-// ---------------- HTTP server ----------------
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -72,7 +69,6 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // Home page - shows QR or status
   if (req.method === 'GET' && req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(`
@@ -80,26 +76,25 @@ const server = http.createServer(async (req, res) => {
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta http-equiv="refresh" content="5">
-        <title>WhatsApp Bot Status</title>
+        <title>WhatsApp Bot</title>
         <style>
-          body{font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#fff;}
+          body{font-family:sans-serif;text-align:center;padding:30px;background:#111;color:#fff;}
+          .status{font-size:18px;margin:20px auto;padding:14px;border-radius:8px;background:#222;max-width:400px;}
           img{max-width:280px;border:8px solid #fff;border-radius:8px;margin-top:20px;}
-          .status{font-size:18px;margin-top:20px;padding:14px;border-radius:8px;background:#222;}
         </style>
       </head>
       <body>
-        <h2>📱 WhatsApp Bot</h2>
+        <h2>📱 WhatsApp Bot Status</h2>
         <div class="status">${statusMsg}</div>
-        ${lastQR ? `<img src="${lastQR}" />` : ''}
-        ${isReady ? '<p style="color:lightgreen;font-size:20px;">✅ Connected &amp; Ready</p>' : ''}
-        <p style="color:#888;font-size:12px;margin-top:30px;">Page har 5 second me refresh hoti hai</p>
+        ${lastQR ? <p>Phone se scan karo:</p><img src="${lastQR}" /> : ''}
+        ${isReady ? '<p style="color:lightgreen;font-size:22px;margin-top:20px;">✅ Connected & Ready!<br>Ab GSRM app me button dabao.</p>' : ''}
+        <p style="color:#555;font-size:12px;margin-top:30px;">Page har 5 second me auto-refresh hoti hai</p>
       </body>
       </html>
     `);
     return;
   }
 
-  // Health check / status as JSON
   if (req.method === 'GET' && req.url === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ready: isReady, status: statusMsg }));
@@ -109,12 +104,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/send') {
     if (!isReady) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'WhatsApp ready nahi hai abhi. Pehle web page khol ke QR scan karo.' }));
+      res.end(JSON.stringify({ ok: false, error: 'Bot ready nahi hai. Pehle web page khol ke QR scan karo.' }));
       return;
     }
     if (isSending) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'Pehle wali request chal rahi hai.' }));
+      res.end(JSON.stringify({ ok: false, error: 'Pehle wali request chal rahi hai, thodi der ruko.' }));
       return;
     }
 
@@ -134,40 +129,25 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  res.writeHead(404, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+  res.writeHead(404); res.end('Not found');
 });
 
 async function sendQueue(list) {
   isSending = true;
-  console.log(`📋 ${list.length} messages bhejne ka order mila...`);
-
+  console.log(📋 ${list.length} messages bhejne ka order mila...);
   for (let i = 0; i < list.length; i++) {
-    const item = list[i];
-    let phone = (item.phone || '').replace(/\D/g, '');
+    let phone = (list[i].phone || '').replace(/\D/g, '');
     if (phone.length === 10) phone = '91' + phone;
-    const chatId = phone + '@c.us';
-
     try {
-      await client.sendMessage(chatId, item.message);
-      console.log(`✅ [${i + 1}/${list.length}] Sent to ${phone}`);
+      await client.sendMessage(phone + '@c.us', list[i].message);
+      console.log(✅ [${i+1}/${list.length}] Sent to ${phone});
     } catch (err) {
-      console.log(`❌ [${i + 1}/${list.length}] FAILED for ${phone} -> ${err.message}`);
+      console.log(❌ [${i+1}/${list.length}] FAILED ${phone}: ${err.message});
     }
-
-    if (i < list.length - 1) {
-      await new Promise(res => setTimeout(res, DELAY_MS));
-    }
+    if (i < list.length - 1) await new Promise(r => setTimeout(r, DELAY_MS));
   }
-  console.log('🎉 Sab messages bhej diye gaye!');
+  console.log('🎉 Done!');
   isSending = false;
 }
 
-server.listen(PORT, () => {
-  console.log(`🌐 Server running on port ${PORT}`);
-});
-
-// Self-ping to reduce sleep frequency while active (optional helper)
-setInterval(() => {
-  console.log('💓 Heartbeat - bot is alive. Status:', statusMsg);
-}, 10 * 60 * 1000);
+server.listen(PORT, () => console.log(🌐 Server on port ${PORT}));
